@@ -80,4 +80,5 @@ class TemporarySubscriber():
             excval (BaseException): The exception value, if any exception was raised.
             traceback (TracebackType): The traceback object, if any exception was raised.
         """
-        self.sub.destroy()
+        pass
+        #self.sub.destroy()
