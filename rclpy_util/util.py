@@ -2,7 +2,10 @@ from rclpy.qos import QoSProfile
 from rclpy.node import Node
 import rclpy
 
-from typing import Union
+import message_filters
+
+from typing import Union, List, Tuple, Type
+
 
 class TemporarySubscriber():
     """
@@ -83,3 +86,72 @@ class TemporarySubscriber():
         #pass
         #self.sub.destroy()
         self.node.destroy_subscription(self.sub)
+
+
+class TemporaryApproximateTimeSynchronizer:
+    """
+    A class to manage a temporary ROS 2 ApproximateTimeSynchronizer using the `with` statement.
+
+    This allows you to create synchronized subscriptions to multiple topics that exist
+    only within the scope of a `with` block. When the block is exited, all subscriptions
+    are automatically destroyed.
+
+    Example usage:
+        >>> from std_msgs.msg import String, Header
+        >>>
+        >>> sub_topics = [(String, 'topic1'), (Header, 'topic2')]
+        >>> with TemporaryApproximateTimeSynchronizer(node, sub_topics, 10, 0.1, callback) as ts:
+        >>>     # Perform operations while the synchronized subscriptions are active.
+        >>>     rclpy.spin_once(node, timeout_sec=1.0)
+        >>> # Subscriptions are automatically cleaned up here.
+    """
+
+    def __init__(
+        self,
+        node: Node,
+        sub_topics: List[Tuple[Type, str]],
+        qos_profile: Union[int, QoSProfile],
+        slop: float,
+        callback,
+        *args
+    ):
+        """
+        Initializes the TemporaryApproximateTimeSynchronizer.
+
+        Args:
+            node (Node): The ROS 2 node where the subscriptions are created.
+            sub_topics (List[Tuple[Type, str]]): A list of tuples, where each tuple contains
+                                                 the message type and the topic name to subscribe to.
+            queue_size (int): The queue size for the synchronizer.
+            slop (float): The time window (in seconds) for message synchronization.
+            callback (function): The callback function to execute with synchronized messages.
+            *args: Additional arguments to be passed to the callback function.
+        """
+        self.node = node
+        self.sub_topics = sub_topics
+        
+        # 内部で message_filters.Subscriber のリストを作成
+        self.filters = [message_filters.Subscriber(node, msg_type, topic, qos_profile=qos_profile) for msg_type, topic in sub_topics]
+        
+        # ApproximateTimeSynchronizer を初期化
+        self.ts = message_filters.ApproximateTimeSynchronizer(self.filters, 10, slop, allow_headerless=True)
+        
+        # コールバックを登録
+        self.ts.registerCallback(callback, *args)
+        
+
+    def __enter__(self) -> message_filters.ApproximateTimeSynchronizer:
+        """
+        Enters the runtime context and returns the synchronizer instance.
+        """
+        return self.ts
+
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        Exits the runtime context, destroying all created subscriptions.
+        """
+        # 各フィルターが内部に持つ rclpy のサブスクリプションを安全に破棄する
+        for sub_filter in self.filters:
+            if hasattr(sub_filter, 'sub') and sub_filter.sub is not None:
+                self.node.destroy_subscription(sub_filter.sub)
