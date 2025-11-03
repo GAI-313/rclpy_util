@@ -100,12 +100,6 @@ rclpy.shutdown()
 - `__enter__()`: Initializes the subscription.
 - `__exit__()`: Cleans up the subscription.
 
-はい、承知いたしました。
-既存のREADMEのスタイルに合わせて、`TemporaryApproximateTimeSynchronizer`に関する説明を記述します。
-以下を`README.md`に追記してください。
-
------
-
 ### Example: TemporaryApproximateTimeSynchronizer
 
 The `TemporaryApproximateTimeSynchronizer` class allows you to create temporary synchronized subscriptions to multiple topics using `message_filters`. All subscriptions are automatically destroyed when the `with` block is exited, simplifying resource management for complex subscription patterns.
